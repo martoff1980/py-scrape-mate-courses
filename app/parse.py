@@ -68,7 +68,11 @@ def extract_duration(card: BeautifulSoup) -> str:
 
 def parse_course_page(href: str) -> dict:
     """Парсит страницу конкретного курса"""
-    card = get_soup(f"{BASE_URL}{href}")
+    try:
+        card = get_soup(BASE_URL)
+    except requests.RequestException as e:
+        print(f"Помилка під час завантаження сторінки: {e}")
+        return []
 
     return {
         "name": extract_course_name(card),
