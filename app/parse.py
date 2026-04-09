@@ -51,11 +51,19 @@ def extract_description(card: BeautifulSoup) -> str:
 
 def extract_duration(card: BeautifulSoup) -> str:
     """Извлекает длительность курса"""
+    duration_keywords = [
+        "місяць", "місяця", "місяців",
+        "тижднів", "тиждні", "тиждень",
+        "month", "months",
+        "week", "weeks",
+        "hour", "hours", "година", "годин"
+    ]
+
     content_divs = card.find_all("div", class_=lambda x: x and CONTENT in x)
-    return (
-        content_divs[12].get_text(strip=True)
-        if len(content_divs) > 12 else "Unknown"
-    )
+    for div in content_divs:
+        text = div.get_text(strip=True)
+        if any(kw in text.lower() for kw in duration_keywords):
+            return text
 
 
 def parse_course_page(href: str) -> dict:
