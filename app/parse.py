@@ -58,7 +58,7 @@ def extract_duration(card: BeautifulSoup) -> str:
         "week", "weeks",
         "hour", "hours", "година", "годин"
     ]
-
+    
     content_divs = card.find_all("div", class_=lambda x: x and CONTENT in x)
     for div in content_divs:
         text = div.get_text(strip=True)
@@ -69,7 +69,7 @@ def extract_duration(card: BeautifulSoup) -> str:
 def parse_course_page(href: str) -> dict:
     """Парсит страницу конкретного курса"""
     try:
-        card = get_soup(BASE_URL)
+        card = get_soup(f"{BASE_URL}{href}")
     except requests.RequestException as e:
         print(f"Помилка під час завантаження сторінки: {e}")
         return []
