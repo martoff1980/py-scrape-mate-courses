@@ -58,7 +58,7 @@ def extract_duration(card: BeautifulSoup) -> str:
         "week", "weeks",
         "hour", "hours", "година", "годин"
     ]
-    
+
     content_divs = card.find_all("div", class_=lambda x: x and CONTENT in x)
     for div in content_divs:
         text = div.get_text(strip=True)
