@@ -7,7 +7,7 @@ BASE_URL = "https://mate.academy"
 MENU = "TracksMenu_tracksListContainer__AGQYv"
 CONTAINER = "flex-container"
 LINK = "TracksList_link__bIVx5"
-HERO_DISCRIPTION = "typography_headlineMedium__cOCGC"
+HERO_DESCRIPTION = "typography_headlineMedium__cOCGC"
 CONTENT = "TableColumnsView_tableCellGray__4hadg"
 
 
@@ -22,105 +22,94 @@ class Course:
 
 
 def get_soup(url: str) -> BeautifulSoup:
+    """Загружает страницу и возвращает BeautifulSoup объект"""
     response = requests.get(url)
     response.raise_for_status()
     return BeautifulSoup(response.text, "html.parser")
 
 
-def parse_course(href: str) -> dict[str, str]:
-    # print(f"Course link: {BASE_URL}{href}")
-    data = {}
-    card = get_soup(f"{BASE_URL}{href}")
-    words = card.find("h1").get_text(strip=True)
-    name = words.split()[0] + " " + words.split()[1]
-    if name.split()[0].lower() == "курс" :
-        name = words.split()[1] + " " + words.split()[2]
+def extract_course_name(card: BeautifulSoup) -> str:
+    """Извлекает название курса из карточки"""
+    h1_text = card.find("h1").get_text(strip=True)
+    words = h1_text.split()
 
-    name = name.split(":")[0].replace("+", " ").strip()
-    # print(f"Course name: {name}")
-    data["name"] = name
+    # Убираем слово "Курс" если оно есть в начале
+    if words[0].lower() == "курс":
+        name = f"{words[1]} {words[2]}"
+    else:
+        name = f"{words[0]} {words[1]}"
 
-    words = card.find(
-        "h2",
-        class_=lambda x: x and HERO_DISCRIPTION in x
-    ).get_text(strip=True)
-    discription = words
-    # print(f"Discription: {discription}")
-    data["short_description"] = discription
-
-    content = card.find_all(
-        "div",
-        class_=lambda x: x and CONTENT in x
-    )[12].get_text(strip=True)
-    # print(f"Content: {content}")
-    data["duration"] = content
-
-    return data
+    # Очищаем название от лишних символов
+    return name.split(":")[0].replace("+", " ").strip()
 
 
-def parse_href(link: str) -> dict[str, str]:
-    href = link.get("href")
-    get_content = parse_course(href)
-    return get_content
+def extract_description(card: BeautifulSoup) -> str:
+    """Извлекает краткое описание курса"""
+    h2 = card.find("h2", class_=lambda x: x and HERO_DESCRIPTION in x)
+    return h2.get_text(strip=True) if h2 else ""
 
 
-def parse_block(block: any) -> list[Course]:
-    coureses = []
-    get_data_course = None
-    name = None
-    decription = None
-    duration = None
-
-    ul = block.find(
-        "ul", class_=lambda x: x and CONTAINER in x
+def extract_duration(card: BeautifulSoup) -> str:
+    """Извлекает длительность курса"""
+    content_divs = card.find_all("div", class_=lambda x: x and CONTENT in x)
+    return (
+        content_divs[12].get_text(strip=True)
+        if len(content_divs) > 12 else "Unknown"
     )
 
-    list_li = ul.find_all("li")
 
-    for li in list_li:
+def parse_course_page(href: str) -> dict:
+    """Парсит страницу конкретного курса"""
+    card = get_soup(f"{BASE_URL}{href}")
+
+    return {
+        "name": extract_course_name(card),
+        "short_description": extract_description(card),
+        "duration": extract_duration(card)
+    }
+
+
+def parse_course_link(link_element: str) -> Course | None:
+    """Парсит ссылку на курс и возвращает объект Course"""
+    href = link_element.get("href")
+    if not href:
+        return None
+
+    course_data = parse_course_page(href)
+    return Course(**course_data)
+
+
+def parse_menu_block(block: any) -> list[Course]:
+    """Парсит блок меню с курсами"""
+    courses = []
+
+    ul = block.find("ul", class_=lambda x: x and CONTAINER in x)
+    if not ul:
+        return courses
+
+    for li in ul.find_all("li"):
         link = li.find("a", class_=lambda x: x and LINK in x)
         if link:
-            get_data_course = parse_href(link)
-            name = get_data_course["name"]
-            decription = get_data_course["short_description"]
-            duration = get_data_course["duration"]
-            course = Course(
-                name=name,
-                short_description=decription,
-                duration=duration
-            )
-            coureses.append(course)
+            course = parse_course_link(link)
+            if course:
+                courses.append(course)
 
-    return coureses
+    return courses
 
 
 def get_all_courses() -> list[Course]:
+    """Главная функция: возвращает список всех курсов"""
     try:
-        response = requests.get(BASE_URL, timeout=10)
-        response.raise_for_status()
+        soup = get_soup(BASE_URL)
     except requests.RequestException as e:
         print(f"Помилка під час завантаження сторінки: {e}")
         return []
 
-    soup = get_soup(BASE_URL)
-
     courses = []
-    course_blocks = soup.find_all(
-        "div",
-        class_=lambda x: x and MENU in x
-    )
-    # print("Found courses in blocks:", len(course_blocks))
+    menu_blocks = soup.find_all("div", class_=lambda x: x and MENU in x)
 
-    for block in course_blocks:
-        try:
-            # показываем начало карточки для отладки
-            # print(f"\nParsing course card {i+1}:")
-            block_data = parse_block(block)
-            courses.extend(block_data)
-
-        except AttributeError:
-            # если структура немного отличается — пропускаем
-            continue
+    for block in menu_blocks:
+        courses.extend(parse_menu_block(block))
 
     return courses
 
